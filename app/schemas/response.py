@@ -5,4 +5,4 @@ T = TypeVar("T")
 
 class StandardResponse(BaseModel, Generic[T]):
     message: str
-    data: Optional[T] = None
+    data: Optional[Any] = None
