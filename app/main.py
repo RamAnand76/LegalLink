@@ -1,4 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from app.api.api import api_router
 from app.core.config import settings
@@ -13,6 +17,36 @@ app = FastAPI(
     openapi_url=f"{settings.API_STR}/openapi.json"
 )
 
+# Set all CORS enabled origins
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Exception handlers for standardized responses
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "message": str(exc.detail),
+            "data": []
+        },
+    )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "message": "Validation Error",
+            "data": exc.errors()
+        },
+    )
+
 # Static files for profile images
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -20,4 +54,7 @@ app.include_router(api_router, prefix=settings.API_STR)
 
 @app.get("/")
 def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API"}
+    return {
+        "message": f"Welcome to {settings.PROJECT_NAME} API",
+        "data": []
+    }

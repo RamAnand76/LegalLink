@@ -92,7 +92,7 @@ def reset_password_me(
     crud.crud_user.user.update(db, db_obj=current_user, obj_in={"password": reset_in.new_password})
     return {
         "message": "Password changed successfully",
-        "data": None
+        "data": []
     }
 
 
