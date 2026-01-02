@@ -323,6 +323,256 @@ const response = await fetch('http://localhost:8000/api/users/me/profile-image',
 
 ---
 
+### 3. Chat (RAG-Powered AI)
+
+All chat endpoints require authentication. The chat system uses Retrieval-Augmented Generation (RAG) to provide context-aware responses.
+
+#### 3.1 Send Message
+
+Send a message to the AI and receive a response.
+
+| Property | Value                      |
+|----------|----------------------------|
+| **URL**  | `/chat/send`               |
+| **Method** | `POST`                   |
+| **Auth** | Bearer Token required      |
+
+**Request Body:**
+
+```json
+{
+  "message": "What are the legal requirements for starting a business?",
+  "session_id": null
+}
+```
+
+| Field        | Type      | Required | Description                                           |
+|--------------|-----------|----------|-------------------------------------------------------|
+| `message`    | `string`  | Yes      | The user's message/question                           |
+| `session_id` | `integer` | No       | Existing session ID. If null, creates a new session.  |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Message sent successfully",
+  "data": {
+    "session_id": 1,
+    "user_message": {
+      "id": 1,
+      "role": "user",
+      "content": "What are the legal requirements for starting a business?",
+      "created_at": "2026-01-02T18:00:00"
+    },
+    "assistant_message": {
+      "id": 2,
+      "role": "assistant",
+      "content": "Starting a business typically involves several legal requirements...",
+      "created_at": "2026-01-02T18:00:05"
+    }
+  }
+}
+```
+
+**Example (JavaScript):**
+
+```javascript
+// Start a new conversation
+const response = await fetch('http://localhost:8000/api/chat/send', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    message: "What are the legal requirements for starting a business?",
+    session_id: null  // null = new session
+  }),
+});
+
+const result = await response.json();
+const sessionId = result.data.session_id;  // Save for follow-up messages
+
+// Continue the conversation
+const followUp = await fetch('http://localhost:8000/api/chat/send', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    message: "What about tax registration?",
+    session_id: sessionId  // Continue in same session
+  }),
+});
+```
+
+---
+
+#### 3.2 Get All Sessions
+
+Retrieve all chat sessions for the current user.
+
+| Property | Value                      |
+|----------|----------------------------|
+| **URL**  | `/chat/sessions`           |
+| **Method** | `GET`                    |
+| **Auth** | Bearer Token required      |
+
+**Query Parameters:**
+
+| Param  | Type      | Default | Description                    |
+|--------|-----------|---------|--------------------------------|
+| `skip` | `integer` | 0       | Number of sessions to skip     |
+| `limit`| `integer` | 50      | Maximum sessions to return     |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Sessions retrieved successfully",
+  "data": [
+    {
+      "id": 2,
+      "title": "Tax registration requirements...",
+      "created_at": "2026-01-02T18:30:00",
+      "updated_at": "2026-01-02T19:00:00"
+    },
+    {
+      "id": 1,
+      "title": "What are the legal requirements...",
+      "created_at": "2026-01-02T18:00:00",
+      "updated_at": "2026-01-02T18:05:00"
+    }
+  ]
+}
+```
+
+---
+
+#### 3.3 Get Session with Messages
+
+Retrieve a specific session with its complete message history.
+
+| Property | Value                         |
+|----------|-------------------------------|
+| **URL**  | `/chat/sessions/{session_id}` |
+| **Method** | `GET`                       |
+| **Auth** | Bearer Token required         |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Session retrieved successfully",
+  "data": {
+    "id": 1,
+    "title": "What are the legal requirements...",
+    "created_at": "2026-01-02T18:00:00",
+    "updated_at": "2026-01-02T18:05:00",
+    "messages": [
+      {
+        "id": 1,
+        "role": "user",
+        "content": "What are the legal requirements for starting a business?",
+        "created_at": "2026-01-02T18:00:00"
+      },
+      {
+        "id": 2,
+        "role": "assistant",
+        "content": "Starting a business typically involves...",
+        "created_at": "2026-01-02T18:00:05"
+      }
+    ]
+  }
+}
+```
+
+**Error Responses:**
+
+| Status | Message                |
+|--------|------------------------|
+| 404    | Chat session not found |
+
+---
+
+#### 3.4 Update Session (Rename)
+
+Rename a chat session.
+
+| Property | Value                         |
+|----------|-------------------------------|
+| **URL**  | `/chat/sessions/{session_id}` |
+| **Method** | `PUT`                       |
+| **Auth** | Bearer Token required         |
+
+**Request Body:**
+
+```json
+{
+  "title": "Business Legal Requirements"
+}
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Session updated successfully",
+  "data": {
+    "id": 1,
+    "title": "Business Legal Requirements",
+    "updated_at": "2026-01-02T19:00:00"
+  }
+}
+```
+
+---
+
+#### 3.5 Delete Session
+
+Delete a chat session and all its messages.
+
+| Property | Value                         |
+|----------|-------------------------------|
+| **URL**  | `/chat/sessions/{session_id}` |
+| **Method** | `DELETE`                    |
+| **Auth** | Bearer Token required         |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Session deleted successfully",
+  "data": []
+}
+```
+
+---
+
+#### 3.6 Rebuild RAG Index
+
+Rebuild the knowledge base index from documents in the `docs` folder.
+
+| Property | Value                      |
+|----------|----------------------------|
+| **URL**  | `/chat/rebuild-index`      |
+| **Method** | `POST`                   |
+| **Auth** | Bearer Token required      |
+
+> **Note:** Use this after adding new documents to the `docs` folder.
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "RAG index rebuilt successfully",
+  "data": []
+}
+```
+
+---
+
 ## Error Handling
 
 All errors follow the standard response format:
@@ -409,6 +659,30 @@ async function login(email, password) {
 // Get Profile (Protected)
 async function getProfile() {
   const response = await fetch(`${BASE_URL}/users/me`, {
+    headers: { 'Authorization': `Bearer ${authToken}` },
+  });
+  return response.json();
+}
+
+// Send Chat Message
+async function sendMessage(message, sessionId = null) {
+  const response = await fetch(`${BASE_URL}/chat/send`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${authToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: message,
+      session_id: sessionId,
+    }),
+  });
+  return response.json();
+}
+
+// Get Chat Sessions
+async function getChatSessions() {
+  const response = await fetch(`${BASE_URL}/chat/sessions`, {
     headers: { 'Authorization': `Bearer ${authToken}` },
   });
   return response.json();
