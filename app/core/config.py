@@ -11,6 +11,16 @@ class Settings(BaseSettings):
 
     SQLALCHEMY_DATABASE_URL: str
 
+    # OpenRouter Configuration
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "google/gemini-2.0-flash-exp:free"
+    OPENROUTER_SITE_URL: str = "http://localhost:8000"
+    OPENROUTER_SITE_NAME: str = "LegalLink"
+
+    # RAG Configuration
+    DOCS_PATH: str = "docs"  # Path to documents for RAG
+    FAISS_INDEX_PATH: str = "faiss_index"  # Path to store FAISS index
+
     model_config = SettingsConfigDict(case_sensitive=True, env_file=".env")
 
 

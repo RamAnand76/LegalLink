@@ -4,17 +4,40 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
+from contextlib import asynccontextmanager
+import logging
+
 from app.api.api import api_router
 from app.core.config import settings
 from app.db.base import Base
 from app.db.session import engine
+from app.services.rag_service import rag_service
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown events."""
+    # Startup
+    logger.info("Starting up LegalLink API...")
+    logger.info("Initializing RAG service...")
+    rag_service.initialize()
+    logger.info("RAG service initialized.")
+    yield
+    # Shutdown
+    logger.info("Shutting down LegalLink API...")
+
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_STR}/openapi.json"
+    openapi_url=f"{settings.API_STR}/openapi.json",
+    lifespan=lifespan
 )
 
 # Set all CORS enabled origins
