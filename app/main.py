@@ -37,7 +37,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_STR}/openapi.json",
-    lifespan=lifespan
+    docs_url="/docs",
+    lifespan=lifespan,
+    swagger_ui_init_oauth={
+        "usePkceWithAuthorizationCodeGrant": True,
+    },
+    swagger_ui_parameters={
+        "persistAuthorization": True,
+    }
 )
 
 # Set all CORS enabled origins

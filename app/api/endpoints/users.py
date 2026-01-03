@@ -27,7 +27,7 @@ def read_user_me(
         current_user.profile_image = "static/default_headshot.png"
     return {
         "message": "Profile retrieved successfully",
-        "data": current_user
+        "data": schemas.user.User.model_validate(current_user)
     }
 
 
@@ -57,7 +57,7 @@ def update_user_me(
     updated_user = crud.crud_user.user.update(db, db_obj=current_user, obj_in=user_in)
     return {
         "message": "Profile updated successfully",
-        "data": updated_user
+        "data": schemas.user.User.model_validate(updated_user)
     }
 
 
@@ -129,5 +129,5 @@ async def update_profile_image(
     
     return {
         "message": "Profile image updated successfully",
-        "data": updated_user
+        "data": schemas.user.User.model_validate(updated_user)
     }
