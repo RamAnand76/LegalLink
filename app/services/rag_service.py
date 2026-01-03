@@ -5,9 +5,10 @@ import os
 import logging
 from typing import List, Optional
 from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader, TextLoader
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
+from langchain_core.documents import Document
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -101,7 +102,6 @@ class RAGService:
         if not documents:
             logger.warning("No documents found. Creating empty vector store.")
             # Create a minimal document to initialize the store
-            from langchain.schema import Document
             documents = [Document(page_content="LegalLink knowledge base initialized.", metadata={"source": "system"})]
         
         # Split documents into chunks
