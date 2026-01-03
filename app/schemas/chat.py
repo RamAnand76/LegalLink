@@ -1,5 +1,5 @@
 from typing import Optional, List
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -13,15 +13,20 @@ class ChatMessageCreate(ChatMessageBase):
     pass
 
 
-class ChatMessage(ChatMessageBase):
+class ChatMessage(BaseModel):
     """Schema for returning a message."""
     id: int
-    session_id: int
     role: str
+    content: str
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class ChatMessageWithContext(ChatMessage):
+    """Schema for returning a message with RAG context."""
+    context_chunks: Optional[List[str]] = None
 
 
 # Chat Session Schemas
@@ -39,10 +44,10 @@ class ChatSessionUpdate(BaseModel):
     title: str
 
 
-class ChatSession(ChatSessionBase):
+class ChatSession(BaseModel):
     """Schema for returning a session."""
-    id: int
-    user_id: int
+    id: str  # UUID string
+    title: str
     created_at: datetime
     updated_at: datetime
 
@@ -58,12 +63,25 @@ class ChatSessionWithMessages(ChatSession):
 # Chat Request/Response
 class ChatRequest(BaseModel):
     """Schema for sending a chat message."""
-    message: str
-    session_id: Optional[int] = None  # If None, creates a new session
+    message: str = Field(..., min_length=1, max_length=10000, description="The user's message")
+    session_id: Optional[str] = Field(None, description="Existing session UUID. If not provided, creates a new session.")
 
 
 class ChatResponse(BaseModel):
-    """Schema for AI response."""
-    session_id: int
+    """Schema for AI response with RAG context."""
+    session_id: str
     user_message: ChatMessage
     assistant_message: ChatMessage
+    context_chunks: List[str] = Field(default=[], description="RAG context chunks used for generating the response")
+
+
+class SessionListItem(BaseModel):
+    """Schema for session list items."""
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: Optional[int] = 0
+
+    class Config:
+        from_attributes = True
