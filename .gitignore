@@ -10,4 +10,3 @@ env.bak/
 venv.bak/
 sql_app.db
 static/uploads/
-index.*
