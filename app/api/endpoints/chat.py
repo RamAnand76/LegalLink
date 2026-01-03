@@ -271,3 +271,39 @@ def rebuild_rag_index(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to rebuild RAG index"
         )
+
+
+@router.post("/test-search", response_model=StandardResponse, summary="Test RAG search with scores")
+def test_rag_search(
+    query: str = Query(..., min_length=1, description="Search query to test"),
+    k: int = Query(6, ge=1, le=20, description="Number of chunks to retrieve"),
+    threshold: float = Query(0.7, ge=0.0, le=1.0, description="Minimum relevance score (0-1)"),
+    current_user: models.user.User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    **Test RAG search and see relevance scores.**
+    
+    This is a debug endpoint to help you understand how relevant the retrieved chunks are.
+    
+    - **query**: The search query
+    - **k**: Number of chunks to retrieve (before filtering)
+    - **threshold**: Minimum similarity score (0-1). Higher = stricter.
+    
+    Returns chunks with their similarity scores so you can tune the threshold.
+    """
+    # Get results with scores
+    results_with_scores = rag_service.search_with_scores(query, k=k)
+    
+    # Also get filtered results
+    filtered_results = rag_service.search(query, k=k, relevance_threshold=threshold)
+    
+    return {
+        "message": f"Found {len(results_with_scores)} chunks, {len(filtered_results)} passed threshold",
+        "data": {
+            "query": query,
+            "threshold": threshold,
+            "total_chunks": len(results_with_scores),
+            "filtered_chunks": len(filtered_results),
+            "results": results_with_scores
+        }
+    }
