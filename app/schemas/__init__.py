@@ -1,1 +1,1 @@
-from . import user, token, msg, response, chat
+from . import user, token, msg, response, chat, document

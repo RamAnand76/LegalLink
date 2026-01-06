@@ -121,18 +121,78 @@ class RAGService:
         self.vector_store.save_local(self.index_path)
         logger.info(f"FAISS index saved to {self.index_path}")
 
-    def search(self, query: str, k: int = 4) -> List[str]:
-        """Search for relevant documents."""
+    def search(self, query: str, k: int = 6, relevance_threshold: float = 0.4) -> List[str]:
+        """
+        Search for relevant documents with relevance filtering.
+        
+        Args:
+            query: The search query
+            k: Maximum number of chunks to retrieve (before filtering)
+            relevance_threshold: Minimum similarity score (0-1) to include a chunk.
+                                 Higher = stricter filtering. Default 0.4 for lenient matching.
+        
+        Returns:
+            List of relevant document chunks that pass the threshold.
+        """
         if not self.vector_store:
-            logger.warning("Vector store not initialized")
+            logger.warning("Vector store not initialized - no documents loaded")
             return []
         
         try:
-            docs = self.vector_store.similarity_search(query, k=k)
-            return [doc.page_content for doc in docs]
+            # Get results with similarity scores
+            # FAISS returns (document, score) where lower score = more similar
+            docs_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
+            
+            if not docs_with_scores:
+                logger.warning("No documents found in vector store")
+                return []
+            
+            # Filter by relevance threshold
+            # FAISS L2 distance: convert to similarity (lower distance = higher similarity)
+            # Typical L2 distances range from 0-2, we normalize: similarity = 1 / (1 + distance)
+            relevant_chunks = []
+            for doc, distance in docs_with_scores:
+                # Convert L2 distance to similarity score (0 to 1)
+                similarity = 1 / (1 + distance)
+                
+                logger.info(f"Chunk similarity: {similarity:.3f} - {doc.page_content[:80]}...")
+                
+                if similarity >= relevance_threshold:
+                    relevant_chunks.append(doc.page_content)
+                else:
+                    logger.debug(f"Filtered out chunk with similarity {similarity:.3f} (threshold: {relevance_threshold})")
+            
+            logger.info(f"RAG search: {len(relevant_chunks)}/{len(docs_with_scores)} chunks passed relevance threshold ({relevance_threshold})")
+            
+            return relevant_chunks
+            
         except Exception as e:
             logger.error(f"Search error: {e}")
             return []
+
+    def search_with_scores(self, query: str, k: int = 6) -> List[dict]:
+        """
+        Search and return chunks with their relevance scores.
+        Useful for debugging and transparency.
+        """
+        if not self.vector_store:
+            return []
+        
+        try:
+            docs_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
+            results = []
+            for doc, distance in docs_with_scores:
+                similarity = 1 / (1 + distance)
+                results.append({
+                    "content": doc.page_content,
+                    "similarity_score": round(similarity, 4),
+                    "source": doc.metadata.get("source", "unknown")
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Search with scores error: {e}")
+            return []
+
 
     def add_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None) -> bool:
         """Add new documents to the vector store."""

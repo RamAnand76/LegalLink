@@ -12,11 +12,22 @@ logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
-        self.api_url = "https://openrouter.ai/api/v1/chat/completions"
-        self.api_key = settings.OPENROUTER_API_KEY
-        self.model = settings.OPENROUTER_MODEL
-        self.site_url = settings.OPENROUTER_SITE_URL
-        self.site_name = settings.OPENROUTER_SITE_NAME
+        # Determine which provider to use
+        self.provider = settings.PROVIDER.lower()
+        if self.provider == "openrouter":
+            self.api_url = "https://openrouter.ai/api/v1/chat/completions"
+            self.api_key = settings.OPENROUTER_API_KEY
+            self.model = settings.OPENROUTER_MODEL
+            self.site_url = settings.OPENROUTER_SITE_URL
+            self.site_name = settings.OPENROUTER_SITE_NAME
+        elif self.provider == "openai":
+            self.api_url = "https://api.openai.com/v1/chat/completions"
+            self.api_key = settings.OPENAI_API_KEY
+            self.model = settings.OPENAI_MODEL
+            self.site_url = ""
+            self.site_name = ""
+        else:
+            raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
     def generate_response(
         self,
@@ -26,19 +37,10 @@ class LLMService:
         system_prompt: str = None
     ) -> str:
         """
-        Generate a response using OpenRouter API.
-        
-        Args:
-            user_message: The user's current message
-            context: Retrieved context from RAG
-            chat_history: Previous messages in the conversation
-            system_prompt: Custom system prompt (optional)
-        
-        Returns:
-            The AI's response as a string
+        Generate a response using the configured LLM provider (OpenRouter or OpenAI).
         """
         if not self.api_key:
-            return "Error: OpenRouter API key not configured. Please set OPENROUTER_API_KEY in your environment."
+            return "Error: LLM API key not configured. Please set the appropriate key in your environment."
 
         # Build the system prompt with context
         if system_prompt is None:
@@ -46,51 +48,80 @@ class LLMService:
 
         # Build messages array
         messages = [{"role": "system", "content": system_prompt}]
-        
-        # Add chat history
+
+        # Add chat history (last 10 messages)
         if chat_history:
-            for msg in chat_history[-10:]:  # Limit to last 10 messages for context
-                messages.append({
-                    "role": msg["role"],
-                    "content": msg["content"]
-                })
-        
+            for msg in chat_history[-10:]:
+                messages.append({"role": msg["role"], "content": msg["content"]})
+
         # Add current user message
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
+        messages.append({"role": "user", "content": user_message})
+
+        # Prepare request payload
+        payload = {
+            "model": self.model,
+            "messages": messages,
+        }
+
+        # Prepare headers based on provider
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+        if self.provider == "openrouter":
+            headers["HTTP-Referer"] = self.site_url
+            headers["X-Title"] = self.site_name
 
         try:
             response = requests.post(
                 url=self.api_url,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": self.site_url,
-                    "X-Title": self.site_name,
-                },
-                data=json.dumps({
-                    "model": self.model,
-                    "messages": messages
-                }),
-                timeout=60
+                headers=headers,
+                data=json.dumps(payload),
+                timeout=60,
             )
-            
             response.raise_for_status()
             result = response.json()
-            
             if "choices" in result and len(result["choices"]) > 0:
                 return result["choices"][0]["message"]["content"]
             else:
                 logger.error(f"Unexpected API response: {result}")
-                return "I apologize, but I couldn't generate a response. Please try again."
-                
+                return "I couldn't generate a response. Please try again."
+        except requests.exceptions.HTTPError as e:
+            # Detect rate‑limit (429) from OpenRouter
+            if e.response is not None and e.response.status_code == 429:
+                logger.warning("OpenRouter rate limit exceeded (429).")
+                # If OpenAI fallback is configured, switch provider for this request
+                if self.provider == "openrouter" and settings.OPENAI_API_KEY:
+                    logger.info("Falling back to OpenAI due to OpenRouter rate limit.")
+                    # Re‑configure for OpenAI and retry once
+                    self.provider = "openai"
+                    self.api_url = "https://api.openai.com/v1/chat/completions"
+                    self.api_key = settings.OPENAI_API_KEY
+                    self.model = settings.OPENAI_MODEL
+                    # Re‑build headers without OpenRouter specific fields
+                    headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+                    try:
+                        response = requests.post(url=self.api_url, headers=headers, data=json.dumps(payload), timeout=60)
+                        response.raise_for_status()
+                        result = response.json()
+                        if "choices" in result and len(result["choices"]) > 0:
+                            return result["choices"][0]["message"]["content"]
+                        else:
+                            logger.error(f"Unexpected OpenAI response: {result}")
+                            return "I couldn't generate a response. Please try again."
+                    except Exception as fallback_err:
+                        logger.error(f"Fallback OpenAI error: {fallback_err}")
+                        return "The service is currently rate‑limited. Please try again later."
+                # No fallback available – inform the user
+                return "The AI service is rate‑limited (429). Please wait a moment and try again."
+            # Other HTTP errors
+            logger.error(f"LLM API HTTP error: {e}")
+            return f"An error occurred while communicating with the AI service: {str(e)}"
         except requests.exceptions.Timeout:
-            logger.error("OpenRouter API timeout")
+            logger.error("LLM API timeout")
             return "The request timed out. Please try again."
         except requests.exceptions.RequestException as e:
-            logger.error(f"OpenRouter API error: {e}")
+            logger.error(f"LLM API error: {e}")
             return f"An error occurred while communicating with the AI service: {str(e)}"
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
