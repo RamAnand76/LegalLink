@@ -86,16 +86,30 @@ Format your response as a valid JSON object:
 
     def _extract_text(self, file_path: str) -> str:
         try:
+            if not os.path.exists(file_path):
+                logger.error(f"File not found: {file_path}")
+                return ""
+                
             file_ext = os.path.splitext(file_path)[1].lower()
             if file_ext == ".pdf":
-                loader = PyPDFLoader(file_path)
-                pages = loader.load()
-                return "\n".join([p.page_content for p in pages])
+                try:
+                    loader = PyPDFLoader(file_path)
+                    pages = loader.load()
+                    if not pages:
+                        logger.warning(f"No pages loaded from PDF: {file_path}")
+                        return ""
+                    return "\n".join([p.page_content for p in pages])
+                except Exception as e:
+                    logger.error(f"PyPDFLoader failed: {e}")
+                    # Fallback or re-raise if critical
+                    return ""
+                    
             elif file_ext == ".txt":
                 with open(file_path, "r", encoding="utf-8") as f:
                     return f.read()
             # Add image OCR here if needed (requires tesseract etc)
             else:
+                logger.warning(f"Unsupported file type: {file_ext}")
                 return ""
         except Exception as e:
             logger.error(f"Text extraction failed: {e}")

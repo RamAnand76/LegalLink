@@ -2,7 +2,7 @@
 Chat API endpoints - Production-ready with UUID sessions and RAG context.
 """
 from typing import Any, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
@@ -333,5 +333,79 @@ def test_rag_search(
             "total_chunks": len(results_with_scores),
             "filtered_chunks": len(filtered_results),
             "results": results_with_scores
+        }
+    }
+
+
+@router.post("/upload", response_model=StandardResponse, summary="Upload document for chat")
+def upload_chat_document(
+    file: UploadFile = File(...),
+    session_id: str = Query(None, description="Optional session ID to link"),
+    db: Session = Depends(deps.get_db),
+    current_user: models.user.User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    **Upload a document specifically for chat context.**
+    
+    This endpoint:
+    1. Uploads the file.
+    2. Creates a DB record.
+    3. IMMEDIATELY triggers RAG indexing for this specific document.
+    4. Returns the `document_id` to be used in `/chat/send`.
+    """
+    # 1. Validation
+    if file.content_type not in ["application/pdf", "image/jpeg", "image/png", "text/plain"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Only PDF, Images, and Text are allowed."
+        )
+        
+    # 2. Save file
+    import os
+    import shutil
+    import uuid
+    from app.api.endpoints.uploads import UPLOAD_DIR # Reuse constants
+    
+    file_ext = os.path.splitext(file.filename)[1]
+    safe_filename = f"{uuid.uuid4()}{file_ext}"
+    file_path = os.path.join(UPLOAD_DIR, safe_filename)
+    
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Could not save file: {str(e)}"
+        )
+        
+    # 3. Create DB Record
+    file_size = os.path.getsize(file_path)
+    uploaded_doc = models.uploaded_document.UploadedDocument(
+        filename=file.filename,
+        file_path=file_path,
+        file_type=file.content_type,
+        file_size=file_size,
+        user_id=current_user.id
+    )
+    db.add(uploaded_doc)
+    db.commit()
+    db.refresh(uploaded_doc)
+    
+    # 4. Trigger Indexing Immediately
+    index_success = rag_service.create_index_for_document(file_path, uploaded_doc.id)
+    
+    if not index_success:
+        # Note: We don't fail the upload, but we warn via a flag or log
+        # In a real app, maybe returning a warning in response
+        pass
+        
+    return {
+        "message": "Document uploaded and processed for chat.",
+        "data": {
+            "document_id": uploaded_doc.id,
+            "filename": uploaded_doc.filename,
+            "indexing_status": "success" if index_success else "failed",
+            "session_id": session_id # Echo back if useful
         }
     }
