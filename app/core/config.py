@@ -20,13 +20,17 @@ class Settings(BaseSettings):
 
     # Free models to rotate through on rate limit
     OPENROUTER_FALLBACK_MODELS: List[str] = [
-        "qwen/qwen-2.5-72b-instruct", # Replaced invalid qwen3-next-80b
-        "mistralai/mistral-small-24b-instruct-2501", # Updated version name
         "google/gemini-2.0-flash-exp:free",
-        "openai/gpt-4o-mini-2024-07-18", # Replacing gpt-oss-120b:free with a likely free/cheap alternative or valid one
-        "nvidia/llama-3.1-nemotron-70b-instruct", # Replaced nemotron-nano
-        "meta-llama/llama-3.2-3b-instruct:free", # Added reliable free model
+        "meta-llama/llama-3.2-3b-instruct:free",
+        "microsoft/phi-3-mini-128k-instruct:free",
+        "mistralai/mistral-7b-instruct:free",
+        "openchat/openchat-7b:free",
+        "gryphe/mythomax-l2-13b:free",
+        "nousresearch/hermes-3-llama-3.1-405b:free",
     ]
+    
+    # Toggle for auto-switching models
+    ENABLE_MODEL_FALLBACK: bool = True
 
     # Provider switch
     PROVIDER: str = "openrouter"  # possible values: "openrouter", "openai"

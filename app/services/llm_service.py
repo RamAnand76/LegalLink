@@ -68,7 +68,7 @@ class LLMService:
         
         # Prepare list of models to try (primary + fallbacks)
         models_to_try = [self.model]
-        if self.provider == "openrouter":
+        if self.provider == "openrouter" and settings.ENABLE_MODEL_FALLBACK:
             models_to_try.extend(settings.OPENROUTER_FALLBACK_MODELS)
             
         last_error = None
@@ -90,30 +90,52 @@ class LLMService:
                 
                 # If successful, return immediately
                 if response.status_code == 200:
-                    result = response.json()
-                    if "choices" in result and len(result["choices"]) > 0:
-                        content = result["choices"][0]["message"]["content"]
-                        # Update the primary model to the working one if we switched
-                        if model != self.model:
-                            logger.info(f"Switched primary model to {model} after successful fallback")
-                            # Optional: Update settings.OPENROUTER_MODEL = model
-                        return content
+                    try:
+                        result = response.json()
+                        if "choices" in result and len(result["choices"]) > 0:
+                            content = result["choices"][0]["message"]["content"]
+                            if model != self.model:
+                                logger.info(f"Switched primary model to {model} after successful fallback")
+                            return content
+                        elif "error" in result:
+                            # API returned 200 but with error in body (rare but possible)
+                            logger.warning(f"API returned error in body for {model}: {result['error']}")
+                            last_error = f"API Error: {result['error']}"
+                            continue # Try next model
+                    except ValueError:
+                        logger.error(f"Failed to decode JSON response from {model}")
+                        last_error = "Invalid JSON response"
+                        continue
+
+                # Handle HTTP errors
+                # We retry on:
+                # 429: Rate Limit
+                # >= 500: Server Error
+                # 404: Model not found/unavailable
+                # 402: Payment Required (maybe quota exceeded, try free model)
+                # 400: Bad Request (could be context length, trying another model might work)
+                if response.status_code in [429, 402, 404] or response.status_code >= 500 or response.status_code == 400:
+                    logger.warning(f"Request failed ({response.status_code}) for model {model}. trying next... Response: {response.text[:200]}")
+                    last_error = f"HTTP {response.status_code}: {response.text[:200]}"
+                    continue
                 
-                # Handle errors
-                if response.status_code == 429:
-                    logger.warning(f"Rate limit (429) for model {model}. Trying next...")
-                    continue
-                elif response.status_code >= 500:
-                    logger.warning(f"Server error ({response.status_code}) for model {model}. Trying next...")
-                    continue
-                else:
-                    # Other client errors (4xx) - likely config/prompt issue, don't retry blindly
-                    logger.error(f"Client error ({response.status_code}) for model {model}: {response.text}")
-                    last_error = f"Error: {response.text}"
-                    break
+                # 401 is Unauthorized (Invalid API Key) - Retrying won't help if using same key
+                if response.status_code == 401:
+                     logger.error(f"Invalid API Key ({response.status_code}) for model {model}.")
+                     last_error = "Invalid API Key"
+                     break
+                     
+                # Other client errors
+                logger.error(f"Client error ({response.status_code}) for model {model}: {response.text}")
+                last_error = f"Error {response.status_code}: {response.text}"
+                continue # Let's retry anyway just in case it's model-specific
                     
             except requests.exceptions.RequestException as e:
-                logger.warning(f"Request failed for model {model}: {e}. Trying next...")
+                logger.warning(f"Request connection failed for model {model}: {e}. Trying next...")
+                last_error = str(e)
+                continue
+            except Exception as e:
+                logger.error(f"Unexpected error for model {model}: {e}. Trying next...")
                 last_error = str(e)
                 continue
                 
