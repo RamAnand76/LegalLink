@@ -65,6 +65,7 @@ class ChatRequest(BaseModel):
     """Schema for sending a chat message."""
     message: str = Field(..., min_length=1, max_length=10000, description="The user's message")
     session_id: Optional[str] = Field(None, description="Existing session UUID. If not provided, creates a new session.")
+    document_id: Optional[str] = Field(None, description="ID of the uploaded document to use for context.")
 
 
 class ChatResponse(BaseModel):

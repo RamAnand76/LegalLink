@@ -121,48 +121,104 @@ class RAGService:
         self.vector_store.save_local(self.index_path)
         logger.info(f"FAISS index saved to {self.index_path}")
 
-    def search(self, query: str, k: int = 6, relevance_threshold: float = 0.4) -> List[str]:
+    def create_index_for_document(self, file_path: str, doc_id: str) -> bool:
         """
-        Search for relevant documents with relevance filtering.
-        
-        Args:
-            query: The search query
-            k: Maximum number of chunks to retrieve (before filtering)
-            relevance_threshold: Minimum similarity score (0-1) to include a chunk.
-                                 Higher = stricter filtering. Default 0.4 for lenient matching.
-        
-        Returns:
-            List of relevant document chunks that pass the threshold.
+        Create a dedicated FAISS index for a specific uploaded document.
+        Saved in {index_path}/docs/{doc_id}
         """
-        if not self.vector_store:
-            logger.warning("Vector store not initialized - no documents loaded")
+        try:
+            logger.info(f"Creating index for document {doc_id} from {file_path}")
+            
+            file_ext = os.path.splitext(file_path)[1].lower()
+            if file_ext == ".pdf":
+                loader = PyPDFLoader(file_path)
+            elif file_ext == ".txt":
+                loader = TextLoader(file_path)
+            else:
+                logger.warning(f"Unsupported file type for indexing: {file_ext}")
+                return False
+                
+            documents = loader.load()
+            
+            # Split into chunks
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=1000,
+                chunk_overlap=200,
+                length_function=len
+            )
+            chunks = text_splitter.split_documents(documents)
+            
+            if not chunks:
+                logger.warning("No chunks created from document")
+                return False
+                
+            # Add metadata
+            for chunk in chunks:
+                chunk.metadata["source"] = "uploaded"
+                chunk.metadata["document_id"] = doc_id
+            
+            # Create FAISS index
+            doc_vector_store = FAISS.from_documents(chunks, self.embeddings)
+            
+            # Save the index to a subdirectory
+            doc_index_path = os.path.join(self.index_path, "docs", doc_id)
+            doc_vector_store.save_local(doc_index_path)
+            
+            logger.info(f"Created index for document {doc_id} at {doc_index_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating document index: {e}")
+            return False
+
+    def _get_document_vector_store(self, doc_id: str):
+        """Load vector store for a specific document."""
+        doc_index_path = os.path.join(self.index_path, "docs", doc_id)
+        if os.path.exists(doc_index_path):
+            try:
+                return FAISS.load_local(
+                    doc_index_path, 
+                    self.embeddings,
+                    allow_dangerous_deserialization=True
+                )
+            except Exception as e:
+                logger.error(f"Error loading document index {doc_id}: {e}")
+        return None
+
+    def search(self, query: str, k: int = 6, relevance_threshold: float = 0.4, document_id: Optional[str] = None) -> List[str]:
+        """
+        Search for relevant documents.
+        If document_id is provided, search ONLY within that document.
+        """
+        store_to_use = self.vector_store
+        
+        if document_id:
+            # Try to load specific document index
+            specific_store = self._get_document_vector_store(document_id)
+            if specific_store:
+                store_to_use = specific_store
+                logger.info(f"Searching within specific document: {document_id}")
+            else:
+                logger.warning(f"Document index not found for {document_id}, falling back to general store")
+                # Alternatively, you could return empty or throw error if strict
+        
+        if not store_to_use:
+            logger.warning("No vector store available for search")
             return []
         
         try:
             # Get results with similarity scores
-            # FAISS returns (document, score) where lower score = more similar
-            docs_with_scores = self.vector_store.similarity_search_with_score(query, k=k)
+            docs_with_scores = store_to_use.similarity_search_with_score(query, k=k)
             
             if not docs_with_scores:
-                logger.warning("No documents found in vector store")
                 return []
             
-            # Filter by relevance threshold
-            # FAISS L2 distance: convert to similarity (lower distance = higher similarity)
-            # Typical L2 distances range from 0-2, we normalize: similarity = 1 / (1 + distance)
             relevant_chunks = []
             for doc, distance in docs_with_scores:
-                # Convert L2 distance to similarity score (0 to 1)
                 similarity = 1 / (1 + distance)
-                
-                logger.info(f"Chunk similarity: {similarity:.3f} - {doc.page_content[:80]}...")
                 
                 if similarity >= relevance_threshold:
                     relevant_chunks.append(doc.page_content)
-                else:
-                    logger.debug(f"Filtered out chunk with similarity {similarity:.3f} (threshold: {relevance_threshold})")
-            
-            logger.info(f"RAG search: {len(relevant_chunks)}/{len(docs_with_scores)} chunks passed relevance threshold ({relevance_threshold})")
             
             return relevant_chunks
             
@@ -173,7 +229,6 @@ class RAGService:
     def search_with_scores(self, query: str, k: int = 6) -> List[dict]:
         """
         Search and return chunks with their relevance scores.
-        Useful for debugging and transparency.
         """
         if not self.vector_store:
             return []

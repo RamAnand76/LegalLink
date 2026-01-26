@@ -18,6 +18,16 @@ class Settings(BaseSettings):
     OPENROUTER_SITE_URL: str = "http://localhost:8000"
     OPENROUTER_SITE_NAME: str = "LegalLink"
 
+    # Free models to rotate through on rate limit
+    OPENROUTER_FALLBACK_MODELS: List[str] = [
+        "qwen/qwen-2.5-72b-instruct", # Replaced invalid qwen3-next-80b
+        "mistralai/mistral-small-24b-instruct-2501", # Updated version name
+        "google/gemini-2.0-flash-exp:free",
+        "openai/gpt-4o-mini-2024-07-18", # Replacing gpt-oss-120b:free with a likely free/cheap alternative or valid one
+        "nvidia/llama-3.1-nemotron-70b-instruct", # Replaced nemotron-nano
+        "meta-llama/llama-3.2-3b-instruct:free", # Added reliable free model
+    ]
+
     # Provider switch
     PROVIDER: str = "openrouter"  # possible values: "openrouter", "openai"
 

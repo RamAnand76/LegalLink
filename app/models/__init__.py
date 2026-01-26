@@ -1,1 +1,1 @@
-from . import user, chat, document
+from . import user, chat, document, uploaded_document

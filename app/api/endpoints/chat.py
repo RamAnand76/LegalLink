@@ -65,7 +65,35 @@ def send_message(
     ]
     
     # Search RAG for relevant context
-    context_chunks = rag_service.search(chat_in.message, k=4)
+    context_chunks = []
+    
+    # If document_id is provided, limit search to that document
+    if chat_in.document_id:
+        # Verify document exists and belongs to user
+        doc = db.query(models.uploaded_document.UploadedDocument).filter(
+            models.uploaded_document.UploadedDocument.id == chat_in.document_id
+        ).first()
+        
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Document not found"
+            )
+        if doc.user_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied to this document"
+            )
+            
+        # Ensure index exists for this document
+        # We might need to create it if it doesn't exist (e.g. first time chat)
+        # Note: Ideally this should happen on upload, but for now we do it lazily or check here
+        rag_service.create_index_for_document(doc.file_path, doc.id)
+        
+        context_chunks = rag_service.search(chat_in.message, k=4, document_id=chat_in.document_id)
+    else:
+        # Default global search
+        context_chunks = rag_service.search(chat_in.message, k=4)
     
     # Generate AI response
     ai_response = llm_service.generate_response(
