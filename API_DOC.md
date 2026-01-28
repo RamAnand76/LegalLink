@@ -14,8 +14,10 @@ Complete API documentation for frontend developers integrating with the LegalLin
    - [Auth](#1-authentication)
    - [Users](#2-user-management)
    - [Chat (RAG AI)](#3-chat-rag-powered-ai)
+   - [User Documents & Analysis](#4-user-documents-and-analysis)
 4. [Error Handling](#error-handling)
 5. [Quick Start Examples](#quick-start-examples)
+6. [System Knowledge Base](#system-knowledge-base)
 
 ---
 
@@ -249,6 +251,7 @@ Send a message and receive an AI response with RAG context.
 |--------------|----------|----------|------------------------------------------------|
 | `message`    | `string` | Yes      | User's message (1-10000 characters)            |
 | `session_id` | `string` | No       | Existing session UUID. Null = new session.     |
+| `document_id`| `string` | No       | ID of a user-uploaded document to use as context.|
 
 **Success Response (200 OK):**
 
@@ -505,6 +508,154 @@ Test RAG search and view relevance scores. Useful for tuning.
 
 ---
 
+---
+
+#### 3.8 Upload Document for Chat (Integrated)
+
+Upload a document specifically for chat context. Indexes it immediately.
+
+| Property   | Value               |
+|------------|---------------------|
+| **URL**    | `/chat/upload`      |
+| **Method** | `POST`              |
+| **Auth**   | Bearer Token        |
+| **Content-Type** | `multipart/form-data` |
+
+**Query Parameters:**
+
+| Param        | Type     | Description                     |
+|--------------|----------|---------------------------------|
+| `session_id` | `string` | Optional session ID to associate|
+
+**Request Body:**
+
+| Field  | Type   | Required | Description                     |
+|--------|--------|----------|---------------------------------|
+| `file` | `file` | Yes      | PDF, Image, or Text file        |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Document uploaded and processed for chat.",
+  "data": {
+    "document_id": "uuid-of-document",
+    "filename": "contract.pdf",
+    "indexing_status": "success",
+    "session_id": "optional-session-id"
+  }
+}
+```
+
+---
+
+### 4. User Documents & Analysis
+
+Endpoints for managing user-uploaded documents and performing specialized analysis.
+
+#### 4.1 Upload Document
+
+General purpose document upload.
+
+| Property   | Value               |
+|------------|---------------------|
+| **URL**    | `/uploads/upload`   |
+| **Method** | `POST`              |
+| **Auth**   | Bearer Token        |
+| **Content-Type** | `multipart/form-data` |
+
+**Request Body:**
+
+| Field  | Type   | Required | Description                     |
+|--------|--------|----------|---------------------------------|
+| `file` | `file` | Yes      | PDF, Image, or Text file        |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "File uploaded successfully",
+  "data": {
+    "id": "uuid-of-document",
+    "filename": "contract.pdf",
+    "file_type": "application/pdf",
+    "file_size": 10240,
+    "created_at": "2026-01-26T12:00:00"
+  }
+}
+```
+
+---
+
+#### 4.2 Analyze Loopholes
+
+Analyze an uploaded document for risks and loopholes.
+
+| Property   | Value                                   |
+|------------|-----------------------------------------|
+| **URL**    | `/uploads/{document_id}/analyze-loopholes` |
+| **Method** | `POST`                                  |
+| **Auth**   | Bearer Token                            |
+
+**Request Body:**
+
+```json
+{
+  "custom_instructions": "Check for liability clauses related to termination."
+}
+```
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Analysis completed successfully",
+  "data": {
+    "document_id": "uuid-of-document",
+    "analysis": "The document is a standard lease agreement...",
+    "concerns": [
+      "Clause 5.2 imposes uncapped liability on the tenant."
+    ],
+    "loopholes": [
+      "No specified timeline for returning the security deposit."
+    ],
+    "created_at": "2026-01-26T12:00:00"
+  }
+}
+```
+
+---
+
+#### 4.3 List Uploaded Documents
+
+| Property   | Value               |
+|------------|---------------------|
+| **URL**    | `/uploads/`         |
+| **Method** | `GET`               |
+| **Auth**   | Bearer Token        |
+
+---
+
+#### 4.4 Get Document Details
+
+| Property   | Value                     |
+|------------|---------------------------|
+| **URL**    | `/uploads/{document_id}`  |
+| **Method** | `GET`                     |
+| **Auth**   | Bearer Token              |
+
+---
+
+#### 4.5 Delete Document
+
+| Property   | Value                     |
+|------------|---------------------------|
+| **URL**    | `/uploads/{document_id}`  |
+| **Method** | `DELETE`                  |
+| **Auth**   | Bearer Token              |
+
+---
+
 ## Error Handling
 
 All errors follow the standard response format:
@@ -685,7 +836,7 @@ When rate-limited (429 error), the system will:
 
 ---
 
-## Document Management
+## System Knowledge Base
 
 ### Adding Documents
 
