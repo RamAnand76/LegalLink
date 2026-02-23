@@ -829,6 +829,7 @@ The LLM providers may rate-limit requests:
 
 - **OpenRouter**: Has request limits per minute
 - **OpenAI**: Based on your API plan
+- **Gemini**: Based on your Google Gen AI usage tier
 
 When rate-limited (429 error), the system will:
 1. Attempt fallback to OpenAI (if configured)

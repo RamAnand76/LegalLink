@@ -12,7 +12,7 @@ A professional, production-ready FastAPI backend for the LegalLink project featu
 ### AI Chat Features
 - **RAG-Powered Chat**: Retrieval-Augmented Generation using legal documents
 - **FAISS Vector Store**: Fast similarity search for document retrieval
-- **Multi-Provider LLM**: Switch between OpenRouter and OpenAI
+- **Multi-Provider LLM**: Switch between OpenRouter, OpenAI, and Gemini
 - **Chat Sessions**: Individual chat history per user (like ChatGPT)
 - **UUID Session IDs**: Secure, unique session identifiers
 - **Context Transparency**: Returns RAG chunks used for each response
@@ -101,16 +101,20 @@ All API responses follow a standardized format:
    ACCESS_TOKEN_EXPIRE_MINUTES=11520
    SQLALCHEMY_DATABASE_URL=sqlite:///./sql_app.db
 
-   # LLM Provider (openrouter or openai)
+   # LLM Provider (openrouter, openai, or gemini)
    PROVIDER=openrouter
 
    # OpenRouter Settings
    OPENROUTER_API_KEY=your-openrouter-api-key
    OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free
 
-   # OpenAI Settings (optional fallback)
+   # OpenAI Settings (optional fallback/provider)
    OPENAI_API_KEY=your-openai-api-key
    OPENAI_MODEL=gpt-3.5-turbo
+
+   # Gemini Settings (optional provider)
+   GEMINI_API_KEY=your-gemini-api-key
+   GEMINI_MODEL=gemini-2.5-flash
 
    # RAG Settings
    DOCS_PATH=docs
@@ -158,6 +162,7 @@ Threshold Guide:
 Set `PROVIDER` in `.env`:
 - `openrouter`: Uses OpenRouter API (free models available)
 - `openai`: Uses OpenAI API
+- `gemini`: Uses Google Gemini API
 
 If OpenRouter rate-limits (429), automatically falls back to OpenAI if configured.
 
@@ -194,9 +199,10 @@ If OpenRouter rate-limits (429), automatically falls back to OpenAI if configure
 |----------|----------|---------|-------------|
 | `SECRET_KEY` | Yes | - | JWT signing key |
 | `SQLALCHEMY_DATABASE_URL` | Yes | - | Database connection string |
-| `PROVIDER` | No | `openrouter` | LLM provider |
+| `PROVIDER` | No | `openrouter` | LLM provider (`openrouter`, `openai`, `gemini`) |
 | `OPENROUTER_API_KEY` | No* | - | OpenRouter API key |
 | `OPENAI_API_KEY` | No* | - | OpenAI API key |
+| `GEMINI_API_KEY` | No* | - | Gemini API key |
 | `DOCS_PATH` | No | `docs` | Documents folder path |
 | `FAISS_INDEX_PATH` | No | `faiss_index` | FAISS index path |
 

@@ -26,6 +26,9 @@ class LLMService:
             self.model = settings.OPENAI_MODEL
             self.site_url = ""
             self.site_name = ""
+        elif self.provider == "gemini":
+            self.api_key = settings.GEMINI_API_KEY
+            self.model = settings.GEMINI_MODEL
         else:
             raise ValueError(f"Unsupported LLM provider: {self.provider}")
 
@@ -56,6 +59,28 @@ class LLMService:
 
         # Add current user message
         messages.append({"role": "user", "content": user_message})
+
+        if self.provider == "gemini":
+            try:
+                from google import genai
+                client = genai.Client(api_key=self.api_key)
+                
+                # Combine prompt for gemini
+                full_prompt = f"System: {system_prompt}\n\n"
+                if chat_history:
+                    for msg in chat_history[-10:]:
+                        role = "User" if msg["role"] == "user" else "Assistant"
+                        full_prompt += f"{role}: {msg['content']}\n\n"
+                full_prompt += f"User: {user_message}"
+                
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=full_prompt
+                )
+                return response.text
+            except Exception as e:
+                logger.error(f"Gemini generation failed: {e}")
+                return f"I couldn't generate a response. The service is currently busy or experiencing issues. (Last error: {e})"
 
         # Prepare headers based on provider
         headers = {

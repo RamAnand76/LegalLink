@@ -33,11 +33,15 @@ class Settings(BaseSettings):
     ENABLE_MODEL_FALLBACK: bool = True
 
     # Provider switch
-    PROVIDER: str = "openrouter"  # possible values: "openrouter", "openai"
+    PROVIDER: str = "openrouter"  # possible values: "openrouter", "openai", "gemini"
 
     # OpenAI Configuration (optional)
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-3.5-turbo"
+
+    # Gemini Configuration
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # RAG Configuration
     DOCS_PATH: str = "docs"  # Path to documents for RAG
