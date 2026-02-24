@@ -15,6 +15,7 @@ Complete API documentation for frontend developers integrating with the LegalLin
    - [Users](#2-user-management)
    - [Chat (RAG AI)](#3-chat-rag-powered-ai)
    - [User Documents & Analysis](#4-user-documents-and-analysis)
+   - [Document Generation](#5-document-generation)
 4. [Error Handling](#error-handling)
 5. [Quick Start Examples](#quick-start-examples)
 6. [System Knowledge Base](#system-knowledge-base)
@@ -653,6 +654,55 @@ Analyze an uploaded document for risks and loopholes.
 | **URL**    | `/uploads/{document_id}`  |
 | **Method** | `DELETE`                  |
 | **Auth**   | Bearer Token              |
+
+---
+
+### 5. Document Generation
+
+Endpoints for creating documents from templates and downloading generated documents.
+
+#### 5.1 Generate Document
+
+| Property   | Value                     |
+|------------|---------------------------|
+| **URL**    | `/documents/generate`     |
+| **Method** | `POST`                    |
+| **Auth**   | Bearer Token              |
+
+#### 5.2 Generate Document Free (AI mode)
+
+| Property   | Value                     |
+|------------|---------------------------|
+| **URL**    | `/documents/generate-free`|
+| **Method** | `POST`                    |
+| **Auth**   | Bearer Token              |
+
+#### 5.3 List My Documents
+
+| Property   | Value                     |
+|------------|---------------------------|
+| **URL**    | `/documents/my-documents` |
+| **Method** | `GET`                     |
+| **Auth**   | Bearer Token              |
+
+#### 5.4 Download Generated Document 
+
+Download a document generated previously.
+
+| Property   | Value                                                |
+|------------|------------------------------------------------------|
+| **URL**    | `/documents/my-documents/{document_id}/download`     |
+| **Method** | `GET`                                                |
+| **Auth**   | Bearer Token                                         |
+
+**Query Parameters:**
+
+| Param    | Type     | Default | Description                                 |
+|----------|----------|---------|---------------------------------------------|
+| `format` | `string` | `pdf`   | Format to download (`pdf` or `txt`)         |
+
+**Success Response (200 OK):**
+Returns a file stream with `Content-Disposition: attachment; filename="..."`.
 
 ---
 

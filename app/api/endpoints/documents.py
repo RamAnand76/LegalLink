@@ -3,7 +3,7 @@ Document Generator API Endpoints - Complaint & Petition Generator.
 """
 import json
 from typing import Any, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.orm import Session
 
 from app import crud, models, schemas
@@ -472,6 +472,93 @@ def delete_my_document(
         "message": "Document deleted successfully",
         "data": []
     }
+
+
+@router.get("/my-documents/{document_id}/download", summary="Download generated document")
+def download_my_document(
+    document_id: str,
+    format: str = Query("pdf", description="Format to download (pdf or txt)"),
+    db: Session = Depends(deps.get_db),
+    current_user: models.user.User = Depends(deps.get_current_user),
+) -> Any:
+    """
+    **Download a generated document.**
+    """
+    document = crud.crud_document.generated_document.get(db, id=document_id)
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found"
+        )
+    
+    if document.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied to this document"
+        )
+    
+    title = document.title or "Generated_Document"
+    # Make a safe filename
+    safe_title = "".join([c if c.isalnum() or c in [' ', '-', '_'] else "_" for c in title])
+    
+    if format.lower() == "pdf":
+        try:
+            from fpdf import FPDF
+            
+            class PDF(FPDF):
+                def header(self):
+                    self.set_font("helvetica", "B", 10)
+                    self.cell(0, 10, "LegalLink Document", border=False, align="R", new_x="LMARGIN", new_y="NEXT")
+                    self.ln(5)
+
+                def footer(self):
+                    self.set_y(-15)
+                    self.set_font("helvetica", "I", 8)
+                    self.cell(0, 10, f"Page {self.page_no()}", align="C")
+
+            pdf = PDF()
+            pdf.add_page()
+            
+            # Print Title
+            pdf.set_font("helvetica", "B", 16)
+            pdf.multi_cell(0, 10, title, align="C", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(10)
+            
+            # Print Content
+            pdf.set_font("helvetica", "", 12)
+            # FPDF defaults to latin-1, so we replace unencodable chars to avoid errors
+            safe_content = document.content.encode('latin-1', 'replace').decode('latin-1')
+            pdf.multi_cell(0, 7, safe_content, new_x="LMARGIN", new_y="NEXT")
+            
+            # output(dest="S") returns bytes in fpdf2
+            pdf_bytes = pdf.output(dest="S")
+            return Response(
+                content=pdf_bytes,
+                media_type="application/pdf",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{safe_title}.pdf"'
+                }
+            )
+        except Exception as e:
+            # Fallback to plain text if something fails
+            import logging
+            logging.error(f"PDF generation failed: {e}")
+            return Response(
+                content=document.content,
+                media_type="text/plain",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{safe_title}.txt"'
+                }
+            )
+    
+    # Default to text format
+    return Response(
+        content=document.content,
+        media_type="text/plain",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_title}.txt"'
+        }
+    )
 
 
 @router.post("/suggest-template", response_model=StandardResponse, summary="Suggest template for description")
