@@ -107,7 +107,53 @@ Format your response as a valid JSON object:
             elif file_ext == ".txt":
                 with open(file_path, "r", encoding="utf-8") as f:
                     return f.read()
-            # Add image OCR here if needed (requires tesseract etc)
+            elif file_ext in [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"]:
+                # Use Gemini Vision to extract text from images
+                try:
+                    from google import genai
+                    from app.core.config import settings
+                    
+                    if not settings.GEMINI_API_KEY:
+                        logger.warning("GEMINI_API_KEY not set — cannot extract text from images")
+                        return ""
+                    
+                    client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                    
+                    # Read image bytes
+                    with open(file_path, "rb") as img_file:
+                        image_bytes = img_file.read()
+                    
+                    # Determine MIME type
+                    mime_map = {
+                        ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                        ".png": "image/png", ".webp": "image/webp",
+                        ".bmp": "image/bmp", ".gif": "image/gif",
+                    }
+                    mime_type = mime_map.get(file_ext, "image/jpeg")
+                    
+                    # Send image + prompt to Gemini
+                    response = client.models.generate_content(
+                        model=settings.GEMINI_MODEL,
+                        contents=[
+                            {
+                                "parts": [
+                                    {"text": "Extract ALL text from this image exactly as it appears. Return only the extracted text, nothing else."},
+                                    {"inline_data": {"mime_type": mime_type, "data": __import__('base64').b64encode(image_bytes).decode('utf-8')}}
+                                ]
+                            }
+                        ]
+                    )
+                    
+                    extracted = response.text.strip() if response.text else ""
+                    if extracted:
+                        logger.info(f"Gemini Vision extracted {len(extracted)} chars from image")
+                    else:
+                        logger.warning("Gemini Vision returned empty text for image")
+                    return extracted
+                    
+                except Exception as e:
+                    logger.error(f"Gemini Vision extraction failed: {e}")
+                    return ""
             else:
                 logger.warning(f"Unsupported file type: {file_ext}")
                 return ""
