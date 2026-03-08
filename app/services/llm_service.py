@@ -37,10 +37,13 @@ class LLMService:
         user_message: str,
         context: List[str] = None,
         chat_history: List[Dict[str, str]] = None,
-        system_prompt: str = None
+        system_prompt: str = None,
+        files: Optional[List[tuple]] = None
     ) -> str:
         """
         Generate a response using the configured LLM provider with fallback rotation.
+        Supports multimodal file uploads for Gemini API.
+        `files` should be a list of tuples: (mime_type, raw_bytes)
         """
         if not self.api_key:
             return "Error: LLM API key not configured. Please set the appropriate key in your environment."
@@ -73,14 +76,25 @@ class LLMService:
                         full_prompt += f"{role}: {msg['content']}\n\n"
                 full_prompt += f"User: {user_message}"
                 
+                # Prepare contents block for Gemini
+                contents = []
+                if files:
+                    from google.genai import types
+                    for mime_type, file_bytes in files:
+                        contents.append(
+                            types.Part.from_bytes(data=file_bytes, mime_type=mime_type)
+                        )
+                contents.append(full_prompt)
+
                 response = client.models.generate_content(
                     model=self.model,
-                    contents=full_prompt
+                    contents=contents
                 )
                 return response.text
             except Exception as e:
                 logger.error(f"Gemini generation failed: {e}")
                 return f"I couldn't generate a response. The service is currently busy or experiencing issues. (Last error: {e})"
+
 
         # Prepare headers based on provider
         headers = {

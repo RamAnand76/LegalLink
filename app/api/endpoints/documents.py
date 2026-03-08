@@ -269,24 +269,37 @@ def generate_document(
     }
 
 
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response, UploadFile, File, Form
+
 @router.post("/generate-free", response_model=StandardResponse, summary="Generate document from description")
 def generate_document_free(
-    request: DocumentGenerateFromDescription,
+    description: str = Form(..., description="Description of the legal matter"),
+    category: Optional[str] = Form(None, description="Category of the document (e.g., complaint, notice)"),
+    title: Optional[str] = Form(None, description="Title of the document"),
+    files: List[UploadFile] = File(None, description="Optional images/documents for context"),
     db: Session = Depends(deps.get_db),
     current_user: models.user.User = Depends(deps.get_current_user),
 ) -> Any:
     """
     **Generate a complete legal document from natural language description.**
     
-    No template required - AI generates the document directly based on your description.
+    No template required - AI generates the document directly based on your description and optional uploaded documents (PDFs, images).
     """
-    category = request.category.value if request.category else None
-    
+    # Read files
+    file_tuples = None
+    if files:
+        file_tuples = []
+        for file in files:
+            if file.filename:
+                file_bytes = file.file.read()
+                file_tuples.append((file.content_type, file_bytes))
+
     # Generate document using LLM
     result = document_generator.generate_document_from_description(
-        description=request.description,
+        description=description,
         category=category,
-        title=request.title
+        title=title,
+        files=file_tuples
     )
     
     # Find or create a "custom" template for storage
@@ -309,7 +322,7 @@ def generate_document_free(
         user_id=current_user.id,
         title=result["title"],
         content=result["content"],
-        input_data=request.description,
+        input_data=description,
         extracted_fields=[{"field_name": "category", "value": result["category"]}]
     )
     

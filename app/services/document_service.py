@@ -138,10 +138,11 @@ JSON Response:"""
         self,
         description: str,
         category: Optional[str] = None,
-        title: Optional[str] = None
+        title: Optional[str] = None,
+        files: Optional[List[tuple]] = None
     ) -> Dict[str, str]:
         """
-        Generate a complete legal document from natural language description.
+        Generate a complete legal document from natural language description and optional files.
         Uses LLM to create the document directly.
         
         Returns:
@@ -150,7 +151,7 @@ JSON Response:"""
         category_hint = f"Document type: {category}" if category else "Determine the appropriate document type"
         title_hint = f"Title: {title}" if title else "Generate an appropriate title"
         
-        generation_prompt = f"""You are an expert legal document drafter. Generate a formal legal document based on the following description.
+        generation_prompt = f"""You are an expert legal document drafter. Generate a formal legal document based on the following description AND/OR the provided documents/images.
 
 USER'S DESCRIPTION:
 {description}
@@ -162,7 +163,7 @@ INSTRUCTIONS:
 1. Generate a properly formatted legal document
 2. Use formal legal language appropriate for Indian courts
 3. Include all standard sections (header, parties, facts, prayer, etc.)
-4. Fill in details from the description
+4. Fill in details from the description and any provided documents/images
 5. For any missing critical information, use placeholders like [PETITIONER'S ADDRESS]
 6. Add appropriate legal citations where relevant
 
@@ -181,7 +182,8 @@ Begin generating:"""
                 user_message=generation_prompt,
                 context=None,
                 chat_history=None,
-                system_prompt="You are an expert legal document drafter specializing in Indian law. Generate formal, properly structured legal documents."
+                system_prompt="You are an expert legal document drafter specializing in Indian law. Generate formal, properly structured legal documents.",
+                files=files
             )
             
             # Parse the response

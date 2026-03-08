@@ -671,13 +671,38 @@ Endpoints for creating documents from templates and downloading generated docume
 
 #### 5.2 Generate Document Free (AI mode)
 
+Generate a complete legal document directly from an open description. You can optionally upload documents (like images or PDFs of related evidence/contracts) to be used as context by the AI.
+
 | Property   | Value                     |
 |------------|---------------------------|
 | **URL**    | `/documents/generate-free`|
 | **Method** | `POST`                    |
 | **Auth**   | Bearer Token              |
+| **Content-Type** | `multipart/form-data` |
 
-#### 5.3 List My Documents
+**Request Body (Form Data):**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `description` | `string` | Yes | Description of the legal matter |
+| `category` | `string` | No | Category of the document (e.g., complaint, notice) |
+| `title` | `string` | No | Title of the document |
+| `files` | `file` | No | Optional images/documents for context (can send multiple) |
+
+**Success Response (200 OK):**
+
+```json
+{
+  "message": "Document generated successfully",
+  "data": {
+    "id": "c3d4e5f6-g7h8-9012-cdef-123456789012",
+    "title": "Legal Notice for Security Deposit",
+    "category": "notice",
+    "content": "LEGAL NOTICE...",
+    "created_at": "2026-01-04T12:00:00"
+  }
+}
+```
 
 | Property   | Value                     |
 |------------|---------------------------|
