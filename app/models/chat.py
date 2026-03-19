@@ -1,7 +1,7 @@
 import uuid
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.db.base_class import Base
 
 
@@ -15,8 +15,8 @@ class ChatSession(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid, index=True)
     user_id = Column(Integer, ForeignKey("user.id"), nullable=False)
     title = Column(String(255), default="New Chat")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     
     # Relationships
     user = relationship("User", back_populates="chat_sessions")
@@ -30,7 +30,7 @@ class ChatMessage(Base):
     role = Column(String(20), nullable=False)  # "user" or "assistant"
     content = Column(Text, nullable=False)
     context_chunks = Column(Text, nullable=True)  # JSON string of RAG context chunks
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     
     # Relationships
     session = relationship("ChatSession", back_populates="messages")

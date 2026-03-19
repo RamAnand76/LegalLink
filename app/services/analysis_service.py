@@ -36,10 +36,14 @@ CUSTOM INSTRUCTIONS:
 {custom_instructions if custom_instructions else "No specific instructions. Perform a general comprehensive risk analysis."}
 
 INSTRUCTIONS:
-1. Identify ambiguous clauses that could be exploited.
-2. Highlight missing standard protections for the user.
-3. Flag any unusually punitive terms.
-4. Provide a summary of the document's intent vs. reality.
+1. Contextual Compliance Check: Evaluate the document strictly against the established laws, regulations, and industry standards of the specific geography and time period provided above. 
+Explicitly call out any clauses that violate or bypass these specific regional frameworks.
+
+2.Semantic Risk Analysis: Do not just read the document literally. 
+Analyze the intent, implied obligations, and practical consequences of the text. Look for vague language, ambiguous definitions, or missing clauses that could be exploited in the real world.
+
+3.Identify Loopholes & Major Concerns: 
+Based on the semantic analysis and jurisdictional context, extract the major vulnerabilities. Focus on scenarios where the document's wording could lead to unintended legal, financial, or operational liabilities.
 
 Format your response as a valid JSON object:
 {{

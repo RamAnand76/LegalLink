@@ -1,7 +1,8 @@
 """
 Chat API endpoints - Production-ready with UUID sessions and RAG context.
 """
-from typing import Any, List
+from typing import Any, List, Optional
+from datetime import timezone as _tz
 from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
@@ -10,6 +11,14 @@ from app.api import deps
 from app.services.rag_service import rag_service
 from app.services.llm_service import llm_service
 from app.schemas.response import StandardResponse
+
+
+def _utc_iso(dt) -> Optional[str]:
+    """Return an ISO-8601 string with explicit UTC offset for any datetime."""
+    if dt is not None and dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_tz.utc)
+    return dt.isoformat() if dt is not None else None
+
 
 router = APIRouter()
 
@@ -119,13 +128,13 @@ def send_message(
                 "id": user_msg.id,
                 "role": user_msg.role,
                 "content": user_msg.content,
-                "created_at": user_msg.created_at.isoformat()
+                "created_at": _utc_iso(user_msg.created_at)
             },
             "assistant_message": {
                 "id": assistant_msg.id,
                 "role": assistant_msg.role,
                 "content": assistant_msg.content,
-                "created_at": assistant_msg.created_at.isoformat()
+                "created_at": _utc_iso(assistant_msg.created_at)
             },
             "context_chunks": context_chunks
         }
@@ -153,8 +162,8 @@ def get_sessions(
         {
             "id": s.id,
             "title": s.title,
-            "created_at": s.created_at.isoformat(),
-            "updated_at": s.updated_at.isoformat(),
+            "created_at": _utc_iso(s.created_at),
+            "updated_at": _utc_iso(s.updated_at),
             "message_count": len(s.messages) if s.messages else 0
         }
         for s in sessions
@@ -196,14 +205,14 @@ def get_session(
         "data": {
             "id": session.id,
             "title": session.title,
-            "created_at": session.created_at.isoformat(),
-            "updated_at": session.updated_at.isoformat(),
+            "created_at": _utc_iso(session.created_at),
+            "updated_at": _utc_iso(session.updated_at),
             "messages": [
                 {
                     "id": m.id,
                     "role": m.role,
                     "content": m.content,
-                    "created_at": m.created_at.isoformat(),
+                    "created_at": _utc_iso(m.created_at),
                     "context_chunks": crud.crud_chat.chat_message.get_context_chunks(m) if m.role == "assistant" else None
                 }
                 for m in messages
@@ -243,7 +252,7 @@ def update_session(
         "data": {
             "id": updated.id,
             "title": updated.title,
-            "updated_at": updated.updated_at.isoformat()
+            "updated_at": _utc_iso(updated.updated_at)
         }
     }
 
